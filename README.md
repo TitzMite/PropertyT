@@ -1,0 +1,218 @@
+# Property (T) through sums of squares: the CMSZ A.2 example
+
+This repository implements a computational approach to Kazhdan's property (T), based on Ozawa's sum-of-squares characterization [[Oza16]](#ref-oza16), the numerical method of Netzer–Thom [[NT15]](#ref-nt15), and the approximation lemma of Kaluba–Kielak–Nowak [[KKN21, Lemma 4.10]](#ref-kkn21). It has two parts:
+
+1. A numerical search and rational certification procedure that can be supplied with multiplication data for a finitely generated group.
+2. An example using the CMSZ triangle presentation **A.2**, with an explicit Gram matrix that can be verified exactly using SymPy.
+
+The example is primarily educational: its property (T), spectral gap, and Kazhdan constant are already known [[CMS94]](#ref-cms94). The numerical solution was accurate enough to reveal simple algebraic coefficients, from which we extracted an exact certificate.
+
+## Getting started
+
+Place the five Python files in the same directory, using these filenames:
+
+| File | Purpose |
+| --- | --- |
+| `group_methods.py` | Cayley balls, products, and multiplication tables. |
+| `grp_CSA2.py` | Generators and word reduction for the CMSZ A.2 group. |
+| `Ozawa_SDP.py` | Semidefinite optimization and rational error certification. |
+| `PropertyT_forA2.py` | Prepare the A.2 example and run the numerical procedure. |
+| `solutionA2.py` | Verify the explicit algebraic certificate exactly. |
+
+Install the dependencies:
+
+```bash
+python -m pip install numpy sympy cvxpy clarabel
+```
+
+Run the numerical search:
+
+```bash
+python PropertyT_forA2.py
+```
+
+Or verify the exact solution directly, without running an SDP solver:
+
+```bash
+python solutionA2.py
+```
+
+After the multiplication-table progress messages, the exact verifier should print:
+
+```text
+Exact solution: True
+Positive semidefinite: True
+```
+
+The exact verifier only requires SymPy and the two local group modules. Both example scripts currently execute their computations when imported as well as when run directly.
+
+## Part 1: Ozawa's method
+
+Let $\Gamma$ have a finite symmetric generating set $S$, excluding the identity. We use the **unnormalized Laplacian**
+
+$$
+\Delta=|S|\,1-\sum_{s\in S}s\in\mathbb R[\Gamma].
+$$
+
+Ozawa's characterization [[Oza16]](#ref-oza16) says that $\Gamma$ has property (T) if and only if, for some $\epsilon>0$, there is a finite sum-of-squares identity
+
+$$
+\Delta^2-\epsilon\Delta=\sum_k\xi_k^*\xi_k,
+$$
+
+where the involution sends a group element to its inverse. The implementation follows the numerical strategy of Netzer–Thom [[NT15]](#ref-nt15) and uses the approximation estimate of Kaluba–Kielak–Nowak [[KKN21, Lemma 4.10]](#ref-kkn21).
+
+### Input and multiplication-table convention
+
+Choose a radius $R\geq1$ and an ordered list of factors
+
+$$
+\texttt{factors}=(g_0,\ldots,g_{m-1})=B_R.
+$$
+
+Also fix an ordered list `products` containing the elements of $B_{2R}$. The integer multiplication table must satisfy
+
+```python
+products[mult[i, j]] == factors[i].inverse() * factors[j]
+```
+
+In particular, this table records **inverse-times-product**, not just `factors[i] * factors[j]`. Its entries are zero-based indices into the same `products` list used for all coefficient vectors.
+
+The group-specific setup needs the generators, factors, and products. The optimization routine itself receives only the resulting arrays and parameters:
+
+```python
+result = OZ.prove_property_T(
+    mult,
+    delta_sq,
+    minus_delta,
+    radius,
+    num_generators,
+)
+```
+
+| Argument | Meaning |
+| --- | --- |
+| `mult` | An $m\times m$ integer NumPy array with the indexing convention above. |
+| `delta_sq` | Coefficients of $\Delta^2$ in the `products` ordering. |
+| `minus_delta` | Coefficients of $-\Delta$ in that same ordering. |
+| `radius` | The factor-support radius $R$, not the product radius $2R$. |
+| `num_generators` | $|S|$, counting the entire symmetric generating set. |
+
+The supplied `compute_table` sorts its distinct products internally. Any adapted setup must ensure that this ordering agrees with its coefficient vectors.
+
+### Numerical search and certification
+
+The SDP maximizes $\epsilon$ subject to a symmetric positive-semidefinite Gram matrix $P$ satisfying
+
+$$
+\sum_{i,j}P_{ij}g_i^{-1}g_j=\Delta^2-\epsilon\Delta.
+$$
+
+The code uses CVXPY with Clarabel. It factors the numerical matrix, rounds the factor to a rational matrix, and adjusts each row to have sum zero. This places the corresponding group-algebra factors in the augmentation ideal. It then computes the coefficient error in exact rational arithmetic.
+
+Writing $x$ for this rational sum of squares and
+
+$$
+\nu=\|\Delta^2-\epsilon\Delta-x\|_1,
+\qquad C=2^{2\lceil\log_2R\rceil},
+$$
+
+the approximation lemma [[KKN21, Lemma 4.10]](#ref-kkn21), also stated in [[TMW26, Lemma 4.18]](#ref-tmw26), gives the certified lower bound
+
+$$
+\epsilon_{\mathrm{cert}}=\epsilon-C\nu.
+$$
+
+If this is positive, property (T) is certified. This constant does not require excluding self-inverse generators. If direct certification fails, the code tries smaller fixed values of $\epsilon$.
+
+On success, the returned dictionary contains the numerical optimum, the rational error, the certified gap, the rounded integer factor and its scale, and a Kazhdan-constant lower bound. The exact value `kappa_sq` represents
+
+$$
+\kappa(\Gamma,S)^2\geq\frac{2\epsilon_{\mathrm{cert}}}{|S|}.
+$$
+
+Failure to obtain a certificate at a chosen radius does not disprove property (T).
+
+## Part 2: the CMSZ A.2 example
+
+We use the $q=2$ triangle presentation labelled **A.2** by Cartwright–Mantero–Steger–Zappa [[CMSZ93, Part II]](#ref-cmsz93):
+
+$$
+\Gamma=\langle s_1,\ldots,s_7\mid
+s_1s_4s_2,
+s_3^2s_1,
+s_5^2s_4,
+s_6^2s_2,
+s_7s_1s_6,
+s_7s_2s_5,
+s_7s_4s_3
+\rangle.
+$$
+
+Each displayed relator is set equal to the identity. This group is an arithmetic lattice in $\mathrm{PGL}_3(\mathbb F_2((t)))$, where $\mathbb F_2((t))$ is the field of formal Laurent series over $\mathbb F_2$. Its vertex links are incidence graphs of the Fano plane. See [[CMSZ93]](#ref-cmsz93) and [[TMW26, Section 6]](#ref-tmw26).
+
+Our symmetric generating set is
+
+$$
+S=\{s_1^{\pm1},\ldots,s_7^{\pm1}\},\qquad |S|=14.
+$$
+
+Cartwright–Młotkowski–Steger computed the exact constants for this setting [[CMS94, Theorem 4.6]](#ref-cms94). With our normalization,
+
+$$
+\operatorname{gap}(\Delta)=10-6\sqrt2,
+\qquad
+\kappa(\Gamma,S)=\sqrt{\frac{10-6\sqrt2}{7}}.
+$$
+
+The normalized Laplacian $\Delta/14$ has gap $(5-3\sqrt2)/7$. Thus the numerical lower bounds here illustrate the method rather than establish a previously unknown property (T) result.
+
+### Extracting and verifying an exact solution
+
+At radius one there are 15 factors and 113 products. The numerical computation produced a Gram matrix whose entries were close enough to simple expressions in $\mathbb Q(\sqrt2)$ to identify an exact candidate.
+
+`solutionA2.py` contains that candidate explicitly. It verifies the coefficient identity at
+
+$$
+\epsilon=10-6\sqrt2
+$$
+
+and proves positivity by checking the annihilating-polynomial identity
+
+$$
+P\bigl(P-(8+12\sqrt2)I\bigr)
+\bigl(P-(22+12\sqrt2)I\bigr)=0.
+$$
+
+The displayed matrix is real and symmetric, so this identity restricts its eigenvalues to three nonnegative numbers. Together, the two checks give an exact sum-of-squares certificate. The symbolic verification is independent of numerical solver accuracy.
+
+The hardcoded matrix uses the factor ordering
+
+$$
+(1,s_7^{-1},s_6^{-1},\ldots,s_1^{-1},s_1,s_2,\ldots,s_7).
+$$
+
+Changing the factor ordering requires applying the same permutation to the rows and columns of the Gram matrix.
+
+### A pattern to explore
+
+After removing its first zero row and column, the exact Gram matrix has the form
+
+$$
+P_{14}=J_{14}+(4+6\sqrt2)I_{14}
+-(6+2\sqrt2)
+\begin{pmatrix}0&N\\N^{\mathsf T}&0\end{pmatrix},
+$$
+
+where $J_{14}$ is the all-ones matrix and $N$ is the $7\times7$ incidence matrix determined by the triangle presentation and the chosen ordering.
+
+This suggests a pattern connecting the certificate with the underlying triangle presentation. We have not pursued a general construction or established how far the pattern extends. We encourage readers to investigate other triangle presentations and look for a conceptual explanation of these exact certificates.
+
+## Bibliography
+
+- <a id="ref-oza16"></a>**[Oza16]** N. Ozawa. *Noncommutative real algebraic geometry of Kazhdan's property (T).* J. Inst. Math. Jussieu 15 (2016), 85–90. [arXiv:1312.5431](https://arxiv.org/abs/1312.5431).
+- <a id="ref-nt15"></a>**[NT15]** T. Netzer and A. Thom. *Kazhdan's property (T) via semidefinite optimization.* Experimental Mathematics 24 (2015), 371–374. [arXiv:1411.2488](https://arxiv.org/abs/1411.2488).
+- <a id="ref-kkn21"></a>**[KKN21]** M. Kaluba, D. Kielak, and P. W. Nowak. *On property (T) for Aut(F_n) and SL_n(Z).* Annals of Mathematics 193 (2021), 539–562. [arXiv:1812.03456](https://arxiv.org/abs/1812.03456).
+- <a id="ref-cmsz93"></a>**[CMSZ93]** D. I. Cartwright, A. M. Mantero, T. Steger, and A. Zappa. *Groups acting simply transitively on the vertices of a building of type A-tilde_2, I; II: the cases q=2 and q=3.* Geometriae Dedicata 47 (1993), 143–166 and 167–223. [Institutional bibliography](https://external.maths.usyd.edu.au/u/pubs/publist/pubs1993.html).
+- <a id="ref-cms94"></a>**[CMS94]** D. I. Cartwright, W. Młotkowski, and T. Steger. *Property (T) and A-tilde_2 groups.* Ann. Inst. Fourier 44 (1994), 213–248. [doi:10.5802/aif.1395](https://doi.org/10.5802/aif.1395).
+- <a id="ref-tmw26"></a>**[TMW26]** T. Titz Mite and S. Witzel. *Non-residually finite C-tilde_2-lattices.* Preprint, August 2026 version. [arXiv:2509.05054v2](https://arxiv.org/abs/2509.05054v2).
