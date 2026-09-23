@@ -7,7 +7,6 @@ identity = A2.A2Word.identity()
 
 generators = A2.geometric_gens
 
-#exclude the
 factors = A2.geometric_ball(radius)
 
 products = A2.geometric_ball(2 * radius)
