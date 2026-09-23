@@ -291,6 +291,9 @@ In other words, the entries are determined by whether a position is on the diago
 
 This suggests a pattern connecting the certificate with the underlying triangle presentation. We have not pursued a general construction or established how far the pattern extends. We encourage readers to investigate other triangle presentations and look for a conceptual explanation of these exact certificates.
 
+## AI Assistance
+OpenAI’s ChatGPT assisted with code development, debugging, symbolic calculations, and documentation.
+
 ## Bibliography
 
 - <a id="ref-oza16"></a>**[Oza16]** N. Ozawa. *Noncommutative real algebraic geometry of Kazhdan's property (T).* J. Inst. Math. Jussieu 15 (2016), 85–90. [arXiv:1312.5431](https://arxiv.org/abs/1312.5431).
